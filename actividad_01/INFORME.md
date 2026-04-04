@@ -1,12 +1,15 @@
 # Informe: Construcción de un Proxy
 
-## Información del estudiante
+## Información estudiantes
 
-- **Nombre:** [Tu nombre]
-- **Email:** [Tu email]
-- **Fecha:** [Fecha de entrega]
+
+| Estudiante | Email  |
+|------------|-------|
+| Esperanza Cares | esperanza.cares@ug.uchile.cl |
+| Jorge Espinosa | jorge.espinosa@ug.uchile.cl |
 
 ---
+
 
 ## 1. Diseño del Proxy
 
