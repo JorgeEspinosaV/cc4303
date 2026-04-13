@@ -1,0 +1,24 @@
+def parse_HTTP_message(http_message):
+    head, body = http_message.split("\r\n\r\n")
+    lines = head.split("\r\n")
+    start_line = lines[0]
+    headers= {}
+    for i in lines[1:]:
+        key, value = i.split(":", 1)
+        headers[key] = value.strip()
+    return {
+        "start_line": start_line,
+        "headers": headers,
+        "body": body
+    }
+def create_HTTP_message(data):
+    message = ""
+    message += data["start_line"] + "\r\n"
+
+    for key, value in data["headers"].items():
+        message += key + ": " + value  + "\r\n"
+    message += "\r\n"
+
+    message += data["body"]
+
+    return message
