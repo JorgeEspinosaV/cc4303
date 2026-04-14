@@ -1,12 +1,40 @@
 import socket
 from proxy import parse_HTTP_message, create_HTTP_message
+import json
+
+def cargar_config(path: str) -> dict:
+    try:
+        with open(path) as f:
+            config = json.load(f)
+    except FileNotFoundError:
+        raise SystemExit(f"Error: no se encontró el archivo '{path}'")
+    except json.JSONDecodeError as e:
+        raise SystemExit(f"Error: JSON malformado en '{path}': {e}")
+
+    # Validar campos requeridos
+    campos_requeridos = ["nombre"]
+    for campo in campos_requeridos:
+        if campo not in config:
+            raise SystemExit(f"Error: falta el campo '{campo}' en el JSON")
+        if not isinstance(config[campo], str) or not config[campo].strip():
+            raise SystemExit(f"Error: el campo '{campo}' debe ser un string no vacío")
+
+    return config
 
 if __name__ == "__main__":
+    import sys
+    if len(sys.argv) < 2:
+        raise SystemExit(f"Uso: python {sys.argv[0]} <archivo_config.json>")
+    
+    config = cargar_config(sys.argv[1])
     # definimos el tamaño del buffer de recepción y la secuencia de fin de mensaje
     buffer_size = 4096
     new_socket_address = ('localhost', 8000)
 
     print('Creando socket - Servidor')
+    # Obtenemos el archivo de config 
+
+
      # armamos el socket
      # los parámetros que recibe el socket indican el tipo de conexión
      # socket.SOCK_STREAM = socket orientado a conexión
@@ -54,7 +82,8 @@ if __name__ == "__main__":
         "headers": {
             "Content-Type": "text/html; charset=utf-8",
             "Content-Length": str(len(html.encode("utf-8"))),
-            "Connection": "close"
+            "Connection": "close",
+            "X-ElQuePregunta": f"{config['nombre']}"
         },
         "body": html
     }
