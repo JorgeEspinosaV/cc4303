@@ -48,56 +48,60 @@ if __name__ == "__main__":
      # si recibiera una 4ta petición de conexión la va a rechazar
     server_socket.listen(3)
     # nos quedamos esperando a que llegue una petición de conexión
+    print('... Esperando clientes (Ctrl+C para detener)')
 
-    print('... Esperando cliente')
-    # cuando llega una petición de conexión la aceptamos
-    # y se crea un nuevo socket que se comunicará con el cliente
-    new_socket, client_address = server_socket.accept()
-    print(f'Conexión aceptada desde {client_address}')
+    try:
+        while True:  # acepta conexiones indefinidamente
+            try:
+                new_socket, client_address = server_socket.accept()
+                print(f'\nConexión aceptada desde {client_address}')
 
-    recv_message = new_socket.recv(buffer_size).decode()
+                try:
+                    recv_message = new_socket.recv(buffer_size).decode()
+                    if not recv_message:
+                        continue
 
-    print('\n--- REQUEST RECIBIDO ---')
-    print(recv_message)
+                    print('\n--- REQUEST RECIBIDO ---')
+                    print(recv_message)
+                    parsed = parse_HTTP_message(recv_message)
+                    print('\n--- PARSEADO ---')
+                    print(parsed)
 
-    parsed = parse_HTTP_message(recv_message)
+                    html = """
+                    <html>
+                        <head><p>Servidor HTTP</p></head>
+                        <body>
+                            <p>Hello, this is a very simple HTML document.</p>
+                        </body>
+                    </html>
+                    """
+                    response = {
+                        "start_line": "HTTP/1.1 200 OK",
+                        "headers": {
+                            "Content-Type": "text/html; charset=utf-8",
+                            "Content-Length": str(len(html.encode("utf-8"))),
+                            "Connection": "close",
+                            "X-ElQuePregunta": f"{config['nombre']}"
+                        },
+                        "body": html
+                    }
+                    response_message = create_HTTP_message(response)
+                    print('\n--- RESPONSE ENVIADO ---')
+                    print(response_message)
+                    new_socket.sendall(response_message.encode("utf-8"))
 
-    print('\n--- PARSEADO ---')
-    print(parsed)
+                except Exception as e:
+                    print(f'Error al manejar la petición: {e}')
 
-    recreated = create_HTTP_message(parsed)
+                finally:
+                    new_socket.close()  # cierra socket cliente
 
-    # response o respuesta HTTP a la petición que se esta recibiendo
-    html = """<html>
-    <head>
-        <p>Servidor HTTP</p>
-    </head>
-    <body>
-        <p>Hello, this is a very simple HTML document.</p>
-    </body>
-</html>"""
+            except Exception as e:
+                print(f'Error al aceptar conexión: {e}')
 
-    response = {
-        "start_line": "HTTP/1.1 200 OK",
-        "headers": {
-            "Content-Type": "text/html; charset=utf-8",
-            "Content-Length": str(len(html.encode("utf-8"))),
-            "Connection": "close",
-            "X-ElQuePregunta": f"{config['nombre']}"
-        },
-        "body": html
-    }
+    except KeyboardInterrupt:
+        print('\nServidor detenido por el usuario')
 
-    response_message = create_HTTP_message(response)
-
-    print('\n--- RESPONSE ENVIADO ---')
-    print(response_message)
-
-    new_socket.sendall(response_message.encode("utf-8"))
-
-
-
-    
-
-    new_socket.close()
-    server_socket.close()
+    finally:
+        server_socket.close()  # cierra socket servidor
+        print('Socket del servidor cerrado')
