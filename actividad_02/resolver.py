@@ -1,5 +1,9 @@
 import socket
 from dnslib import DNSRecord, QTYPE
+direccion = "192.33.4.12"
+port = 53
+Buffer = 4096
+
 def parse_dns_message(data):
     d = DNSRecord.parse(data)
     qname = str(d.get_q().get_qname())
@@ -37,6 +41,22 @@ def parse_dns_message(data):
         })
     return parsed_message
     
+def send_dns_query(q_bytes, server_ip):
+    sock = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
+    server_address = (server_ip, port)
+    try:
+        # lo enviamos, hacemos cast a bytes de lo que resulte de la función pack() sobre el mensaje
+         sock.sendto(q_bytes, server_address)
+         # En data quedará la respuesta a nuestra consulta
+         data, _ = sock.recvfrom(Buffer)
+         # le pedimos a dnslib que haga el trabajo de parsing por nosotros 
+         return data
+    finally:
+         sock.close()
+
+def resolver(mssg):
+    respuesta = send_dns_query(mssg, direccion)
+    return respuesta
 
 #creamos socket
 sock = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
@@ -45,6 +65,6 @@ while True:
     data, addr = sock.recvfrom(4096)
     print("Mensaje recibido desde:", addr)
     print(data)
-    parsed = parse_dns_message(data)
-    print(parsed)
+    respuesta = resolver(data)
+    sock.sendto(respuesta, addr)
 
