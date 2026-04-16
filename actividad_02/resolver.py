@@ -56,7 +56,21 @@ def send_dns_query(q_bytes, server_ip):
 
 def resolver(mssg):
     respuesta = send_dns_query(mssg, direccion)
-    return respuesta
+    parsed = parse_dns_message(respuesta)
+    for rr in parsed["answer"]:
+        if rr["type"] == "A":
+            return respuesta
+        
+    ns_list = []
+    for rr in parsed["Authority"]:
+        if rr[type] == "NS":
+            ns_list.append(rr)
+
+    if ns_list:
+        for rr in parsed["Additional"]:
+            if rr["type"] == "A":
+                respuesta_ i = send_dns_query(mssg, rr["data"])
+
 
 #creamos socket
 sock = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
