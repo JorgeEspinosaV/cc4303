@@ -76,19 +76,25 @@ if __name__ == "__main__":
                     </html>
                     """
                     response = {
-                        "start_line": "HTTP/1.1 200 OK",
-                        "headers": {
-                            "Content-Type": "text/html; charset=utf-8",
-                            "Content-Length": str(len(html.encode("utf-8"))),
-                            "Connection": "close",
-                            "X-ElQuePregunta": f"{config['nombre']}"
-                        },
-                        "body": html
+                        "start_line": parsed["start_line"],
+                        "headers": parsed["headers"],
+                        "body": parsed["body"]
                     }
                     response_message = create_HTTP_message(response)
                     print('\n--- RESPONSE ENVIADO ---')
                     print(response_message)
-                    new_socket.sendall(response_message.encode("utf-8"))
+
+                    # Creamos socket cliente
+                    print('Creando socket - Cliente')
+                     
+                    # armamos el socket, los parámetros que recibe el socket indican el tipo de conexión
+                    # socket.SOCK_STREAM = socket orientado a conexión
+                    client_socket = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+                     
+                    # Como es un socket orientado a conexión debemos conectarlo a la dirección acordada
+                    client_socket.connect(address)
+                      
+                    client_socket.send(send_message)
 
                 except Exception as e:
                     print(f'Error al manejar la petición: {e}')
