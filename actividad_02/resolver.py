@@ -1,8 +1,12 @@
 import socket
 from dnslib import DNSRecord, QTYPE
+from collections import deque, Counter 
+
 direccion = "192.33.4.12"
 port = 53
 buffer = 4096
+historial = deque(maxlen=20)  # guarda las últimas 20 consultas
+cache = {}
 #
 def parse_dns_message(data):
     #Parsea los bytes
@@ -69,6 +73,7 @@ def resolver(mssg, server_ip=direccion):
     answer = send_dns_query(mssg, server_ip)
     #PArsear respuesta recibida
     parsed = parse_dns_message(answer)
+    print(f"(debug) Consultando '{parsed["Qname"]}' con dirección IP '{server_ip}'")
     #3.b: Si mensaje answer recibido tiene la respuesta a la cosulta
     for rr in parsed["Answer"]:
         if rr["type"] == "A":
@@ -106,18 +111,33 @@ def resolver(mssg, server_ip=direccion):
     #3.d: Algún otro tipo de respuesta, ignorar
     return None
 
+def actualizar_cache(dominio, respuesta):
+    historial.append(dominio)
+    top3 = {dom for dom, _ in Counter(historial).most_common(3)}
+    if dominio in top3:
+        cache[dominio] = respuesta
+    for key in list(cache.keys()):
+        if key not in top3:
+            del cache[key]
+
 #creamos socket "servidor"
 sock = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
 #Asociamos a puerto 8000
-sock.bind(('localhost', 8000))
+sock.bind(('0.0.0.0', 8000))
 while True:
     #Espera consulta DNS
     data, addr = sock.recvfrom(4096)
     print("Mensaje recibido desde:", addr)
     print(data)
-    #MAndar la query recibida a función resolver
+    qname = parse_dns_message(data)["Qname"]
+    
+    if qname in cache:
+        print(f"(debug) Respondiendo '{qname}' desde caché")
+        sock.sendto(cache[qname], addr)
+        continue
+
     answer = resolver(data)
-    #Si devolvió respuesta válida, enviar a cliente 
     if answer:
+        actualizar_cache(qname, answer)
         sock.sendto(answer, addr)
 

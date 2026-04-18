@@ -16,40 +16,10 @@
 ### 1.1 Diagrama de funcionamiento
 
 
-$\sqrt{3x-1}$
 
 
 ```Mermaid
 sequenceDiagram
-    autonumber
-    actor Cliente as Cliente (Browser / cURL)
-    participant Proxy as Proxy (Tu código en la VM)
-    participant Servidor as Servidor Destino (ej: cc4303)
-
-    Note over Proxy: Socket 1: "Listen Socket"<br/>(Escuchando en IP_VM:8000)
-    
-    Cliente->>Proxy: Intenta conectar
-    Note over Proxy: Proxy hace accept() y crea<br/>Socket 2: "Client Socket"
-    
-    Cliente->>Proxy: Envía HTTP Request
-    
-    Proxy->>Proxy: Parsea Request y revisa URI (JSON)
-    
-    alt URI está bloqueada (403)
-        Proxy-->>Cliente: Responde HTTP 403 Forbidden + HTML (Gatos)
-        Note over Proxy, Cliente: Se cierra el "Client Socket"
-    else URI permitida
-        Proxy->>Proxy: Modifica Headers (Agrega X-ElQuePregunta)
-        
-        Note over Proxy: Proxy crea<br/>Socket 3: "Server Socket"
-        Proxy->>Servidor: Conecta al puerto 80 del Servidor
-        
-        Proxy->>Servidor: Reenvía HTTP Request modificado
-        Servidor-->>Proxy: Responde HTTP Response
-        
-        Proxy->>Proxy: Lee el Body, busca y reemplaza forbidden_words
-        
-        Proxy-->>Cliente: Reenvía HTTP ResponsesequenceDiagram
     autonumber
     actor Cliente as Cliente (Browser / cURL)
     participant Proxy as Proxy (Tu código en la VM)
