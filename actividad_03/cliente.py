@@ -1,5 +1,6 @@
 import socket
 import sys
+from SocketTCP import SocketTCP
 
 data_size = 16
 
@@ -19,10 +20,24 @@ def main():
 
     print(f"Cliente: se leyeron {len(message)} bytes", file=sys.stderr, flush=True)
 
+    seq = 0
+
     for i in range(0, len(message), data_size):
         chunk = message[i:i + data_size]
-        print(f"Cliente: enviando {chunk!r}", file=sys.stderr, flush=True)
-        client_socket.sendto(chunk, server_address)
+
+        segment = SocketTCP.create_segment(
+            syn=0,
+            ack=0,
+            fin=0,
+            seq=seq,
+            data=chunk
+        )
+
+        print(f"Cliente: enviando segmento seq={seq}, data={chunk!r}", file=sys.stderr, flush=True)
+
+        client_socket.sendto(segment, server_address)
+
+        seq += len(chunk)
 
     client_socket.close()
 
