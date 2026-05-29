@@ -225,3 +225,176 @@ class SocketTCP:
             except socket.timeout:
                 # El servidor sigue esperando conexiones
                 continue
+    
+    
+    def _send_ack(self, ack_seq):
+        """
+        Envía un ACK a la contraparte.
+        Usamos el campo SEQ del header como número de confirmación.
+        """
+        ack_segment = self.create_segment(
+            syn=0,
+            ack=1,
+            fin=0,
+            seq=ack_seq,
+            data=b""
+        )
+
+        self.udp_socket.sendto(ack_segment, self.destination_address)
+
+    def _send_with_stop_and_wait(self, payload):
+        """
+        Envía un payload usando Stop & Wait.
+        Envía el segmento con self.seq y espera un ACK con seq = self.seq + len(payload).
+        Si hay timeout, retransmite.
+        """
+
+        expected_ack = self.seq + len(payload)
+
+        segment = self.create_segment(
+            syn=0,
+            ack=0,
+            fin=0,
+            seq=self.seq,
+            data=payload
+        )
+
+        while True:
+            print(
+                f"[SEND] Enviando segmento seq={self.seq}, "
+                f"esperando ACK={expected_ack}, data={payload!r}"
+            )
+
+            self.udp_socket.sendto(segment, self.destination_address)
+
+            try:
+                response, _ = self.udp_socket.recvfrom(UDP_BUFFER_SIZE)
+                parsed = self.parse_segment(response)
+
+                print(
+                    f"[SEND] Recibido: ACK={parsed['ACK']} "
+                    f"SEQ={parsed['SEQ']}"
+                )
+
+                if parsed["ACK"] == 1 and parsed["SEQ"] == expected_ack:
+                    self.seq = expected_ack
+                    return
+
+            except socket.timeout:
+                print("[SEND] Timeout. Retransmitiendo segmento...")
+
+    def send(self, message):
+        """
+        Envía un mensaje usando Stop & Wait.
+
+        Primero envía el largo total del mensaje.
+        Luego envía el contenido dividido en trozos de máximo 16 bytes.
+        """
+
+        if isinstance(message, str):
+            message = message.encode()
+
+        message_length = len(message)
+        length_payload = str(message_length).encode()
+
+        print(f"[SEND] Enviando largo del mensaje: {message_length}")
+
+        # Primer segmento: largo del mensaje
+        self._send_with_stop_and_wait(length_payload)
+
+        # Luego se envía el mensaje en trozos de máximo 16 bytes
+        for i in range(0, message_length, MAX_DATA_SIZE):
+            chunk = message[i:i + MAX_DATA_SIZE]
+            self._send_with_stop_and_wait(chunk)
+
+    def _receive_next_data_segment(self):
+        """
+        Recibe el siguiente segmento de datos esperado.
+        Si llega un duplicado, vuelve a enviar ACK pero no duplica datos.
+        """
+
+        while True:
+            try:
+                segment, sender_address = self.udp_socket.recvfrom(UDP_BUFFER_SIZE)
+                parsed = self.parse_segment(segment)
+
+                seq = parsed["SEQ"]
+                data = parsed["DATA"]
+
+                print(
+                    f"[RECV] Recibido segmento seq={seq}, "
+                    f"esperado={self.expected_seq}, data={data!r}"
+                )
+
+                # Aseguramos dirección de destino para responder ACK
+                self.destination_address = sender_address
+
+                # Caso normal: llegó el segmento esperado
+                if seq == self.expected_seq:
+                    self.expected_seq += len(data)
+                    self._send_ack(self.expected_seq)
+
+                    print(f"[RECV] ACK enviado con seq={self.expected_seq}")
+
+                    return data
+
+                # Caso duplicado: ya fue recibido antes
+                elif seq < self.expected_seq:
+                    print("[RECV] Segmento duplicado. Reenviando ACK.")
+                    self._send_ack(self.expected_seq)
+
+                # Caso fuera de orden
+                else:
+                    print("[RECV] Segmento fuera de orden. Reenviando último ACK.")
+                    self._send_ack(self.expected_seq)
+
+            except socket.timeout:
+                # El receptor simplemente sigue esperando.
+                continue
+
+    def recv(self, buff_size):
+        """
+        Recibe datos usando Stop & Wait.
+
+        Retorna a lo más buff_size bytes.
+        Si el mensaje completo es más grande que buff_size, guarda los datos
+        pendientes para futuras llamadas a recv().
+        """
+
+        result = b""
+
+        # Primero consumir datos pendientes de llamadas anteriores
+        if self.pending_data:
+            amount = min(buff_size, len(self.pending_data))
+            result += self.pending_data[:amount]
+            self.pending_data = self.pending_data[amount:]
+            self.remaining_message_length -= amount
+
+            if len(result) == buff_size or self.remaining_message_length == 0:
+                return result
+
+        # Si no hay mensaje en curso, primero recibimos el largo
+        if self.remaining_message_length == 0:
+            length_data = self._receive_next_data_segment()
+            self.remaining_message_length = int(length_data.decode())
+
+            print(f"[RECV] Largo del mensaje recibido: {self.remaining_message_length}")
+
+        # Recibir datos hasta llenar buff_size o terminar mensaje
+        while len(result) < buff_size and self.remaining_message_length > 0:
+            data = self._receive_next_data_segment()
+
+            available_space = buff_size - len(result)
+
+            # Si el segmento cabe completo
+            if len(data) <= available_space:
+                result += data
+                self.remaining_message_length -= len(data)
+
+            # Si el segmento excede buff_size, guardar sobrante
+            else:
+                result += data[:available_space]
+                self.pending_data += data[available_space:]
+                self.remaining_message_length -= available_space
+
+        return result

@@ -14,7 +14,19 @@ def main():
     client_socketTCP = SocketTCP()
     client_socketTCP.connect(address)
 
-    print("Cliente terminó prueba de handshake")
+    # Test 1
+    message = "Mensje de len=16".encode()
+    client_socketTCP.send(message)
+
+    # Test 2
+    message = "Mensaje de largo 19".encode()
+    client_socketTCP.send(message)
+
+    # Test 3
+    message = "Mensaje de largo 19".encode()
+    client_socketTCP.send(message)
+
+    print("Cliente terminó pruebas send/recv")
 
 
 if __name__ == "__main__":
