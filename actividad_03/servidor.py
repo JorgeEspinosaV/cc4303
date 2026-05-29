@@ -37,7 +37,7 @@ def main():
         print("Esperado:", EXPECTED_MESSAGE)
         print("Recibido:", full_message)
 
-    # OJO:
+  
     # Para esta etapa NO llamamos recv_close().
     # El cierre con pérdidas se implementa en el siguiente paso.
     

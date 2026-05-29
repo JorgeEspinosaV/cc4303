@@ -25,11 +25,8 @@ def main():
 
     print("Cliente terminó envío con pérdidas")
 
-    # OJO:
     # Para esta etapa NO cerramos la conexión,
-    # porque el enunciado dice que las pérdidas pueden causar problemas
-    # con el cierre y que eso es esperable.
-    #
+    # porque el enunciado dice que las pérdidas pueden causar problemas con el cierre y que eso es esperable.
     client_socketTCP.close()
     print("Cliente cerró conexión")
 
