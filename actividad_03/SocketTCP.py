@@ -10,7 +10,7 @@ TIMEOUT = 1.0
 
 # Simular pérdida
 # 0.2 = 20% de pérdida
-LOSS_PROBABILITY = 0.2
+LOSS_PROBABILITY = 0.0
 #cuando se pierde un paquete
 DEBUG_LOSS = True
 

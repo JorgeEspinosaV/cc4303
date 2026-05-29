@@ -1,1 +1,1 @@
-Hola, este es un mensaje de prueba bastante largo para verificar que el cliente UDP lo divide en trozos de 16 bytes y que el servidor lo recibe completo.
+echo "Hola, este es un mensaje de prueba bastante largo para verificar que el cliente UDP lo divide en trozos de 16 bytes y que el servidor lo recibe completo." > archivo.txt

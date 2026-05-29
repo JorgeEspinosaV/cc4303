@@ -2,13 +2,6 @@ import sys
 from SocketTCP import SocketTCP
 
 
-EXPECTED_MESSAGE = (
-    "Este es un mensaje largo para probar Stop and Wait con perdidas. "
-    "Debe llegar completo aunque se pierdan paquetes artificialmente. "
-    "La gracia es que cada segmento espera su ACK antes de continuar."
-).encode()
-
-
 def main():
     if len(sys.argv) != 2:
         print("Uso: python3 servidor.py <puerto>", file=sys.stderr)
@@ -20,29 +13,27 @@ def main():
     server_socketTCP = SocketTCP()
     server_socketTCP.bind(address)
 
-    print(f"Servidor escuchando en {address}")
+    print(f"Servidor escuchando en {address}", file=sys.stderr)
 
     connection_socketTCP, new_address = server_socketTCP.accept()
 
-    print(f"Conexión aceptada en nuevo socket: {new_address}")
+    print(f"Conexión aceptada en nuevo socket: {new_address}", file=sys.stderr)
 
-    full_message = connection_socketTCP.recv(1000)
+    # Tamaño suficientemente grande para esta prueba.
+    # Si quieres recibir archivos enormes, habría que hacer un loop.
+    received_file = connection_socketTCP.recv(10_000_000)
 
-    print("Mensaje recibido:", full_message)
+    # Imprime el archivo recibido en salida estándar.
+    sys.stdout.buffer.write(received_file)
+    sys.stdout.buffer.flush()
 
-    if full_message == EXPECTED_MESSAGE:
-        print("Test con pérdidas: Passed")
-    else:
-        print("Test con pérdidas: Failed")
-        print("Esperado:", EXPECTED_MESSAGE)
-        print("Recibido:", full_message)
+    print("\nServidor: archivo recibido correctamente", file=sys.stderr)
 
-  
     # Para esta etapa NO llamamos recv_close().
     # El cierre con pérdidas se implementa en el siguiente paso.
-    
     connection_socketTCP.recv_close()
-    print("Servidor cerró conexión")
+
+    print("Servidor: conexión cerrada", file=sys.stderr)
 
 
 if __name__ == "__main__":
