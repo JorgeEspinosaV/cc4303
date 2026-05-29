@@ -1,5 +1,6 @@
 import socket
 import random
+import time 
 
 MAX_DATA_SIZE = 16
 UDP_BUFFER_SIZE = 1024
@@ -404,8 +405,14 @@ class SocketTCP:
 
     def close(self):
         """
-        Cierre sin tolerancia a pérdidas.
-        Lo dejamos implementado, pero para esta prueba no lo usaremos.
+        Cierra la conexión desde el lado Host A tolerando pérdidas.
+
+        Secuencia:
+        1. Envía FIN.
+        2. Espera ACK y FIN.
+        3. Si hay timeout, reenvía FIN hasta 3 veces.
+        4. Si recibe ACK y FIN, envía el último ACK tres veces.
+        5. Cierra el socket.
         """
 
         fin_segment = self.create_segment(
@@ -416,76 +423,103 @@ class SocketTCP:
             data=b""
         )
 
+        got_ack = False
+        got_fin = False
+        timeout_count = 0
+
         print(f"[CLOSE] Enviando FIN seq={self.seq}")
         self._sendto(fin_segment, self.destination_address)
 
-        while True:
-            response, _ = self.udp_socket.recvfrom(UDP_BUFFER_SIZE)
-            parsed = self.parse_segment(response)
+        while not (got_ack and got_fin):
+            try:
+                response, sender_address = self.udp_socket.recvfrom(UDP_BUFFER_SIZE)
+                parsed = self.parse_segment(response)
 
-            print(
-                f"[CLOSE] Recibido: "
-                f"SYN={parsed['SYN']} ACK={parsed['ACK']} "
-                f"FIN={parsed['FIN']} SEQ={parsed['SEQ']}"
-            )
-
-            if parsed["ACK"] == 1:
-                print("[CLOSE] ACK recibido")
-                break
-
-        while True:
-            response, _ = self.udp_socket.recvfrom(UDP_BUFFER_SIZE)
-            parsed = self.parse_segment(response)
-
-            print(
-                f"[CLOSE] Recibido: "
-                f"SYN={parsed['SYN']} ACK={parsed['ACK']} "
-                f"FIN={parsed['FIN']} SEQ={parsed['SEQ']}"
-            )
-
-            if parsed["FIN"] == 1:
-                print("[CLOSE] FIN recibido desde contraparte")
-
-                ack_segment = self.create_segment(
-                    syn=0,
-                    ack=1,
-                    fin=0,
-                    seq=self.seq + 1,
-                    data=b""
+                print(
+                    f"[CLOSE] Recibido: "
+                    f"SYN={parsed['SYN']} ACK={parsed['ACK']} "
+                    f"FIN={parsed['FIN']} SEQ={parsed['SEQ']} "
+                    f"desde {sender_address}"
                 )
 
-                print(f"[CLOSE] Enviando ACK final seq={self.seq + 1}")
-                self._sendto(ack_segment, self.destination_address)
-                break
+                if parsed["ACK"] == 1:
+                    got_ack = True
+                    print("[CLOSE] ACK del FIN recibido")
+
+                if parsed["FIN"] == 1:
+                    got_fin = True
+                    print("[CLOSE] FIN de la contraparte recibido")
+
+            except socket.timeout:
+                timeout_count += 1
+
+                print(
+                    f"[CLOSE] Timeout esperando ACK/FIN "
+                    f"({timeout_count}/3). Reenviando FIN..."
+                )
+
+                if timeout_count >= 3:
+                    print("[CLOSE] Se alcanzaron 3 timeouts. Se asume contraparte cerrada.")
+                    self.udp_socket.close()
+                    return
+
+                self._sendto(fin_segment, self.destination_address)
+
+        # Si recibió ACK y FIN con éxito, envía ACK final tres veces.
+        final_ack_segment = self.create_segment(
+            syn=0,
+            ack=1,
+            fin=0,
+            seq=self.seq + 1,
+            data=b""
+        )
+
+        for i in range(3):
+            print(f"[CLOSE] Enviando ACK final {i + 1}/3 seq={self.seq + 1}")
+            self._sendto(final_ack_segment, self.destination_address)
+            time.sleep(TIMEOUT)
 
         print("[CLOSE] Cerrando socket")
         self.udp_socket.close()
 
     def recv_close(self):
         """
-        Cierre sin tolerancia a pérdidas.
-        Lo dejamos implementado, pero para esta prueba no lo usaremos.
+        Cierra la conexión desde el lado Host B tolerando pérdidas.
+
+        Secuencia:
+        1. Espera FIN.
+        2. Envía ACK.
+        3. Envía FIN.
+        4. Espera ACK final hasta 3 timeouts.
+        5. Si no llega ACK final, asume que la contraparte cerró.
+        6. Cierra el socket.
         """
 
         print("[RECV_CLOSE] Esperando FIN...")
 
+        # Paso 1: esperar FIN
         while True:
-            segment, sender_address = self.udp_socket.recvfrom(UDP_BUFFER_SIZE)
-            parsed = self.parse_segment(segment)
+            try:
+                segment, sender_address = self.udp_socket.recvfrom(UDP_BUFFER_SIZE)
+                parsed = self.parse_segment(segment)
 
-            print(
-                f"[RECV_CLOSE] Recibido: "
-                f"SYN={parsed['SYN']} ACK={parsed['ACK']} "
-                f"FIN={parsed['FIN']} SEQ={parsed['SEQ']} "
-                f"desde {sender_address}"
-            )
+                print(
+                    f"[RECV_CLOSE] Recibido: "
+                    f"SYN={parsed['SYN']} ACK={parsed['ACK']} "
+                    f"FIN={parsed['FIN']} SEQ={parsed['SEQ']} "
+                    f"desde {sender_address}"
+                )
 
-            self.destination_address = sender_address
+                self.destination_address = sender_address
 
-            if parsed["FIN"] == 1:
-                print("[RECV_CLOSE] FIN recibido")
-                break
+                if parsed["FIN"] == 1:
+                    print("[RECV_CLOSE] FIN recibido")
+                    break
 
+            except socket.timeout:
+                continue
+
+        # Paso 2: enviar ACK del FIN recibido
         ack_segment = self.create_segment(
             syn=0,
             ack=1,
@@ -497,6 +531,7 @@ class SocketTCP:
         print(f"[RECV_CLOSE] Enviando ACK seq={self.seq}")
         self._sendto(ack_segment, self.destination_address)
 
+        # Paso 3: enviar FIN propio
         fin_segment = self.create_segment(
             syn=0,
             ack=0,
@@ -508,19 +543,45 @@ class SocketTCP:
         print(f"[RECV_CLOSE] Enviando FIN seq={self.seq}")
         self._sendto(fin_segment, self.destination_address)
 
+        # Paso 4: esperar ACK final hasta 3 timeouts
+        timeout_count = 0
+
         while True:
-            response, _ = self.udp_socket.recvfrom(UDP_BUFFER_SIZE)
-            parsed = self.parse_segment(response)
+            try:
+                response, sender_address = self.udp_socket.recvfrom(UDP_BUFFER_SIZE)
+                parsed = self.parse_segment(response)
 
-            print(
-                f"[RECV_CLOSE] Recibido: "
-                f"SYN={parsed['SYN']} ACK={parsed['ACK']} "
-                f"FIN={parsed['FIN']} SEQ={parsed['SEQ']}"
-            )
+                print(
+                    f"[RECV_CLOSE] Recibido: "
+                    f"SYN={parsed['SYN']} ACK={parsed['ACK']} "
+                    f"FIN={parsed['FIN']} SEQ={parsed['SEQ']} "
+                    f"desde {sender_address}"
+                )
 
-            if parsed["ACK"] == 1:
-                print("[RECV_CLOSE] ACK final recibido")
-                break
+                if parsed["ACK"] == 1:
+                    print("[RECV_CLOSE] ACK final recibido")
+                    break
+
+                # Si vuelve a llegar FIN duplicado, reenviamos ACK y FIN.
+                if parsed["FIN"] == 1:
+                    print("[RECV_CLOSE] FIN duplicado recibido. Reenviando ACK y FIN.")
+                    self._sendto(ack_segment, self.destination_address)
+                    self._sendto(fin_segment, self.destination_address)
+
+            except socket.timeout:
+                timeout_count += 1
+
+                print(
+                    f"[RECV_CLOSE] Timeout esperando ACK final "
+                    f"({timeout_count}/3)"
+                )
+
+                if timeout_count >= 3:
+                    print("[RECV_CLOSE] Se alcanzaron 3 timeouts. Se asume contraparte cerrada.")
+                    break
 
         print("[RECV_CLOSE] Cerrando socket")
         self.udp_socket.close()
+
+
+    

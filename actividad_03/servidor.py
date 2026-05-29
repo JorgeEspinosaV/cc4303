@@ -40,9 +40,9 @@ def main():
     # OJO:
     # Para esta etapa NO llamamos recv_close().
     # El cierre con pérdidas se implementa en el siguiente paso.
-    #
-    # connection_socketTCP.recv_close()
-    # print("Servidor cerró conexión")
+    
+    connection_socketTCP.recv_close()
+    print("Servidor cerró conexión")
 
 
 if __name__ == "__main__":

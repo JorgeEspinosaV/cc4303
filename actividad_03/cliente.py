@@ -30,8 +30,8 @@ def main():
     # porque el enunciado dice que las pérdidas pueden causar problemas
     # con el cierre y que eso es esperable.
     #
-    # client_socketTCP.close()
-    # print("Cliente cerró conexión")
+    client_socketTCP.close()
+    print("Cliente cerró conexión")
 
 
 if __name__ == "__main__":
