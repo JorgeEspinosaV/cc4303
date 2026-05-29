@@ -2,6 +2,13 @@ import sys
 from SocketTCP import SocketTCP
 
 
+EXPECTED_MESSAGE = (
+    "Este es un mensaje largo para probar Stop and Wait con perdidas. "
+    "Debe llegar completo aunque se pierdan paquetes artificialmente. "
+    "La gracia es que cada segmento espera su ACK antes de continuar."
+).encode()
+
+
 def main():
     if len(sys.argv) != 2:
         print("Uso: python3 servidor.py <puerto>", file=sys.stderr)
@@ -19,42 +26,23 @@ def main():
 
     print(f"Conexión aceptada en nuevo socket: {new_address}")
 
-    # Test 1
-    buff_size = 16
-    full_message = connection_socketTCP.recv(buff_size)
-    print("Test 1 received:", full_message)
+    full_message = connection_socketTCP.recv(1000)
 
-    if full_message == "Mensje de len=16".encode():
-        print("Test 1: Passed")
+    print("Mensaje recibido:", full_message)
+
+    if full_message == EXPECTED_MESSAGE:
+        print("Test con pérdidas: Passed")
     else:
-        print("Test 1: Failed")
+        print("Test con pérdidas: Failed")
+        print("Esperado:", EXPECTED_MESSAGE)
+        print("Recibido:", full_message)
 
-    # Test 2
-    buff_size = 19
-    full_message = connection_socketTCP.recv(buff_size)
-    print("Test 2 received:", full_message)
-
-    if full_message == "Mensaje de largo 19".encode():
-        print("Test 2: Passed")
-    else:
-        print("Test 2: Failed")
-
-    # Test 3
-    buff_size = 14
-    message_part_1 = connection_socketTCP.recv(buff_size)
-    message_part_2 = connection_socketTCP.recv(buff_size)
-
-    print("Test 3 received:", message_part_1 + message_part_2)
-
-    if (message_part_1 + message_part_2) == "Mensaje de largo 19".encode():
-        print("Test 3: Passed")
-    else:
-        print("Test 3: Failed")
-
-    # Cierre de conexión
-    connection_socketTCP.recv_close()
-
-    print("Servidor cerró conexión")
+    # OJO:
+    # Para esta etapa NO llamamos recv_close().
+    # El cierre con pérdidas se implementa en el siguiente paso.
+    #
+    # connection_socketTCP.recv_close()
+    # print("Servidor cerró conexión")
 
 
 if __name__ == "__main__":

@@ -2,6 +2,13 @@ import sys
 from SocketTCP import SocketTCP
 
 
+EXPECTED_MESSAGE = (
+    "Este es un mensaje largo para probar Stop and Wait con perdidas. "
+    "Debe llegar completo aunque se pierdan paquetes artificialmente. "
+    "La gracia es que cada segmento espera su ACK antes de continuar."
+).encode()
+
+
 def main():
     if len(sys.argv) != 3:
         print("Uso: python3 cliente.py <host> <puerto>", file=sys.stderr)
@@ -14,24 +21,17 @@ def main():
     client_socketTCP = SocketTCP()
     client_socketTCP.connect(address)
 
-    # Test 1
-    message = "Mensje de len=16".encode()
-    client_socketTCP.send(message)
+    client_socketTCP.send(EXPECTED_MESSAGE)
 
-    # Test 2
-    message = "Mensaje de largo 19".encode()
-    client_socketTCP.send(message)
+    print("Cliente terminó envío con pérdidas")
 
-    # Test 3
-    message = "Mensaje de largo 19".encode()
-    client_socketTCP.send(message)
-
-    print("Cliente terminó pruebas send/recv")
-
-    # Cierre de conexión
-    client_socketTCP.close()
-
-    print("Cliente cerró conexión")
+    # OJO:
+    # Para esta etapa NO cerramos la conexión,
+    # porque el enunciado dice que las pérdidas pueden causar problemas
+    # con el cierre y que eso es esperable.
+    #
+    # client_socketTCP.close()
+    # print("Cliente cerró conexión")
 
 
 if __name__ == "__main__":
