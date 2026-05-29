@@ -51,6 +51,11 @@ def main():
     else:
         print("Test 3: Failed")
 
+    # Cierre de conexión
+    connection_socketTCP.recv_close()
+
+    print("Servidor cerró conexión")
+
 
 if __name__ == "__main__":
     main()

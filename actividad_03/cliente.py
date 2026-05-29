@@ -28,6 +28,11 @@ def main():
 
     print("Cliente terminó pruebas send/recv")
 
+    # Cierre de conexión
+    client_socketTCP.close()
+
+    print("Cliente cerró conexión")
+
 
 if __name__ == "__main__":
     main()

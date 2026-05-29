@@ -398,3 +398,146 @@ class SocketTCP:
                 self.remaining_message_length -= available_space
 
         return result
+    
+    def close(self):
+        """
+        Cierra la conexión desde el lado Host A.
+
+        Secuencia:
+        1. Envía FIN.
+        2. Espera ACK.
+        3. Espera FIN.
+        4. Envía ACK final.
+        5. Cierra el socket UDP.
+        """
+
+        # Paso 1: enviar FIN
+        fin_segment = self.create_segment(
+            syn=0,
+            ack=0,
+            fin=1,
+            seq=self.seq,
+            data=b""
+        )
+
+        print(f"[CLOSE] Enviando FIN seq={self.seq}")
+        self.udp_socket.sendto(fin_segment, self.destination_address)
+
+        # Paso 2: esperar ACK del FIN
+        while True:
+            response, _ = self.udp_socket.recvfrom(UDP_BUFFER_SIZE)
+            parsed = self.parse_segment(response)
+
+            print(
+                f"[CLOSE] Recibido: "
+                f"SYN={parsed['SYN']} ACK={parsed['ACK']} "
+                f"FIN={parsed['FIN']} SEQ={parsed['SEQ']}"
+            )
+
+            if parsed["ACK"] == 1:
+                print("[CLOSE] ACK recibido")
+                break
+
+        # Paso 3: esperar FIN de la contraparte
+        while True:
+            response, _ = self.udp_socket.recvfrom(UDP_BUFFER_SIZE)
+            parsed = self.parse_segment(response)
+
+            print(
+                f"[CLOSE] Recibido: "
+                f"SYN={parsed['SYN']} ACK={parsed['ACK']} "
+                f"FIN={parsed['FIN']} SEQ={parsed['SEQ']}"
+            )
+
+            if parsed["FIN"] == 1:
+                print("[CLOSE] FIN recibido desde contraparte")
+
+                # Paso 4: enviar ACK final
+                ack_segment = self.create_segment(
+                    syn=0,
+                    ack=1,
+                    fin=0,
+                    seq=self.seq + 1,
+                    data=b""
+                )
+
+                print(f"[CLOSE] Enviando ACK final seq={self.seq + 1}")
+                self.udp_socket.sendto(ack_segment, self.destination_address)
+                break
+
+        print("[CLOSE] Cerrando socket")
+        self.udp_socket.close()
+
+    def recv_close(self):
+        """
+        Cierra la conexión desde el lado Host B.
+
+        Secuencia:
+        1. Espera FIN.
+        2. Envía ACK.
+        3. Envía FIN.
+        4. Espera ACK final.
+        5. Cierra el socket UDP.
+        """
+
+        print("[RECV_CLOSE] Esperando FIN...")
+
+        # Paso 1: esperar FIN desde Host A
+        while True:
+            segment, sender_address = self.udp_socket.recvfrom(UDP_BUFFER_SIZE)
+            parsed = self.parse_segment(segment)
+
+            print(
+                f"[RECV_CLOSE] Recibido: "
+                f"SYN={parsed['SYN']} ACK={parsed['ACK']} "
+                f"FIN={parsed['FIN']} SEQ={parsed['SEQ']} "
+                f"desde {sender_address}"
+            )
+
+            self.destination_address = sender_address
+
+            if parsed["FIN"] == 1:
+                print("[RECV_CLOSE] FIN recibido")
+                break
+
+        # Paso 2: enviar ACK al FIN recibido
+        ack_segment = self.create_segment(
+            syn=0,
+            ack=1,
+            fin=0,
+            seq=self.seq,
+            data=b""
+        )
+
+        print(f"[RECV_CLOSE] Enviando ACK seq={self.seq}")
+        self.udp_socket.sendto(ack_segment, self.destination_address)
+
+        # Paso 3: enviar FIN propio
+        fin_segment = self.create_segment(
+            syn=0,
+            ack=0,
+            fin=1,
+            seq=self.seq,
+            data=b""
+        )
+
+        print(f"[RECV_CLOSE] Enviando FIN seq={self.seq}")
+        self.udp_socket.sendto(fin_segment, self.destination_address)
+
+        # Paso 4: esperar ACK final
+        while True:
+            response, _ = self.udp_socket.recvfrom(UDP_BUFFER_SIZE)
+            parsed = self.parse_segment(response)
+
+            print(
+                f"[RECV_CLOSE] Recibido: "
+                f"SYN={parsed['SYN']} ACK={parsed['ACK']} "
+                f"FIN={parsed['FIN']} SEQ={parsed['SEQ']}"
+            )
+
+            if parsed["ACK"] == 1:
+                print("[RECV_CLOSE] ACK final recibido")
+                break
+
+        print("[RECV_CLOSE] Cerrando socket")
+        self.udp_socket.close()
