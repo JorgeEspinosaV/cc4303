@@ -1,0 +1,92 @@
+En esta actividad implementaremos TCP con mecanismos de control de congestión basándonos en el código implementado en la actividad anterior. En particular, aquí implementaremos control de congestión basado en TCP Tahoe, por lo que la sección Antes de empezar contendrá información sobre el funcionamiento de dicha implementación.
+
+Puntaje: 4.5 pts código + 1.5 pts informe
+
+El desglose de puntaje por funcionalidad del código es el siguiente (Si su código pasa las pruebas debería cumplir con los puntos mencionados aquí):
+
+(+1.5) La clase de manejo de control de congestión funciona correctamente
+(+1.5) Se implementa correctamente Go-Back N
+(+1.5) Los eventos de control de congestión son llamados correctamente
+Fairness
+Internet es una red Justa o Fair, esto significa que todos los flujos de mensaje tienen derecho a usar la red y, por lo tanto, ningún flujo de mensajes debe acaparar la capacidad de la red. Para evitar que la red sea acaparada injustamente por algunos flujos de mensajes se utilizan mecanismos de control de congestión.
+
+Es importante notar que el control de congestión en TCP varía según la implementación de TCP. Dentro de estas implementaciones, las más conocidas son TCP Tahoe y TCP Reno, sin embargo existen otras. TCP Tahoe es una implementación antigua la cual no considera fast recovery, es decir solo considera: slow start, congestion avoidance (AIMD) y fast retransmit. Por su lado TCP Reno considera: slow start, congestion avoidance (AIMD), fast retransmit y fast recovery.
+
+Antes de empezar
+Simulador de Go-Back N y Selective Repeat: En el siguiente enlace pueden encontrar un simulador interactivo de Go-Back N y Selective Repeat  https://www2.tkn.tu-berlin.de/teaching/rn/animations/gbn_sr/ . Para usar el simulador basta con definir las condiciones del tamaño de la ventana, protocolo ARQ, delay y timeout como prefiera (también puede utilizar la configuración default) y apretar start. Para simular pérdidas basta con que haga click en el segmento que desee perder.
+Maximum Segment Size (MSS): El MSS es la máxima unidad de datos que se pueden enviar dentro de un segmento (no considera el tamaño del header TCP).
+Congestion window (cwnd): Corresponde a la cantidad máxima de segmentos que podemos enviar en un determinado momento. 
+Slow Start Threshold (ssthresh): Tamaño máximo que puede tener la cwnd dentro de slow start. Si cwnd pasa este límite, se pasa a congestion avoidance.
+Slow Start: Al comenzar la transmisión de datos usamos slow start quien aumenta en el tamaño de la cwnd en 1 MSS cada vez que recibe un ACK de manera exitosa. La primera vez que se detecta timeout se setea el ssthresh = cwnd/2 y cwnd = 1 MSS. Si cwnd >= ssthresh pasa a AIMD.
+Fast retransmit: Hace referencia al mecanismo de detección de pérdida de segmentos donde no esperamos a que se cumpla un timeout para reenviar el segmento. Aquí la condición de detección de pérdida es recibir 3 ACKs duplicados, es decir, un ACK repetido 3 veces antes de que se cumpla el timeout correspondiente.
+Congestion avoidance (AIMD): Corresponde a la etapa de control de congestión donde aumentamos el tamaño de la ventana de forma lineal. Para ello usamos Additive Increase Multiplicative Decrease (AIMD). Aquí se aumenta el tamaño de la ventana en MSS/cwnd cada vez que llega un ACK de manera exitosa, de esta manera la se aumenta en el tamaño de la cwnd en 1 MSS cada vez que se reciben de forma exitosa tantos ACKs como MSS caben en la cwnd (de esta parte viene el nombre Additive Increase). Si ocurre un timeout se vuelve a slow start con ssthresh = cwnd/2 y cwnd = 1 MSS (de esta parte viene el nombre Multiplicative Decrease). En TCP Tahoe si detectamos pérdida usando fast retransmit entonces se vuelve a slow start con ssthresh = cwnd/2 y cwnd = 1 MSS.
+Clase SlidingWindowCC: Para esta actividad usaremos la clase SlidingWindowCC la cual actualiza los números de secuencia de acuerdo al largo en bytes que se ha enviado. Para ver una explicación más detallada vea la sección anterior SocketUDP y SlidingWindowCC. Puede descargar el código de esta clase desde u-cursos.
+Clase SocketUDP: Para esta actividad también usaremos la clase SocketUDP la cual permite manejar uno o más timers a conveniencia. Para ver una explicación más detallada vea la sección anterior SocketUDP y SlidingWindowCC. Puede descargar el código de esta clase desde u-cursos.
+Actividad
+Esta actividad consta de 3 partes. Para la primera parte no requiere modificar código anterior. Luego crearemos el código necesario para manejar Go Back-N y le agregaremos mecanismos de control de congestión similares a TCP Tahoe (i.e. en esta actividad solo implementaremos slow start y congestion avoidance). Haga una copia de su código de la actividad de Stop & Wait y trabaje sobre dicha copia. 
+>>> IMPORTANTE: Si bien nos vamos a basar en los mecanismos de control de congestión de TCP Tahoe, el código que vamos a implementar sigue siendo una versión simplificada de TCP.
+
+Parte 1 (1.5 ptos)
+Cree la clase CongestionControl para manejar el control de congestión de forma ordenada. Esta tendrá todo lo necesario para manejar la cwnd dependiendo del estado dentro de control de congestión (slow start o congestion avoidance) y el valor de sus variables (ssthresh, cwnd, MSS,etc.). Esta clase se utilizará dentro de la función send_using_go_back_n que implementará más adelante según corresponda. Para implementar la clase CongestionControl siga los siguientes pasos.
+
+Parta definiendo el constructor de su clase con todo lo que estime necesario. Haga que su constructor se invoque con la siguiente firma: CongestionControl(MSS: int) Para ello necesitará al menos las siguientes variables (puede que necesite más variables!): 
+ - current_state: Indica el estado actual dentro de control de congestión, este puede ser slow start o congestion avoidance. Siempre se inicializa como slow start.
+ - MSS:  Integer que indica el tamaño máximo en bytes del área de datos de un segmento congestión.
+ - cwnd: Integer que indica el tamaño de la ventana de congestión en bytes. Este se inicializa siempre como 1 MSS.
+ - ssthresh:  Slow Start threshold. Cuando current_state es slow start si cwnd >= ssthresh entonces cambia current_state a congestion avoidance. Note que el ssthresh valor se define luego del primer timeout durante slow start, antes de ser definida debe ser igual a None.
+
+Añada a su clase CongestionControl la función get_cwnd() la cual debe retornar el valor cwnd almacenado en su objeto CongestionControl. Note que este valor corresponde al tamaño en bytes.
+Añada a su clase CongestionControl la función get_MSS_in_cwnd(). Esta función retorna la el tamaño de la ventana expresado como la cantidad de MSSs completos que caben en cwnd. Por ejemplo si su función get_cwnd() retorna 17 y MSS = 4, entonces get_MSS_in_cwnd() deberá retornar 4.
+Añada a su clase CongestionControl la función event_ack_received(). Esta función se encargará de manejar los cambios asociados a la recepción de ACKs. Por ejemplo, si su current_state es slow start entonces recibir un ACK resultará en el aumento de cwnd en 1 MSS. Similarmente event_ack_received deberá manejar el caso en que current_state sea igual congestion avoidance. Para los aumentos en congestion avoidance, note que cada aumento corresponde a una fracción (1/self.get_MSS_in_cwnd()) de MSS. No olvide que al aumentar el cwnd debe checkear si dicho aumento genera un cambio en el estado current_state. Si se genera un cambio de estado recuerde actualizar sus otras variables según sea necesario.
+Añada a su clase CongestionControl la función event_timeout(). Esta función se encargará de manejar los cambios asociados a que ocurra timeout. Por ejemplo, si es la primera vez que ocurre timeout dentro de slow start entonces deberá inicializar el valor de ssthresh. Esta función también deberá manejar los cambios de estado, de tamaño de ventana de congestión y de Slow Start threshold.
+Finalmente añada las funciones is_state_slow_start() y is_state_congestion_avoidance() las cuales retornan True si se encuentran en el estado especificado por el nombre de la función y False si no. Y añada la función get_ssthresh() que retorna el valor de la variable ssthresh almacenada.
+Una vez haya implementado su clase ejecute el test disponible en u-cursos test disponible en u-cursos.
+Test: Ejecute el test "CongestionControl_test.py" disponible en material docente en u-cursos. Pruebe con distintos MSS.
+Parte 2 (1.5 ptos)
+Ahora crearemos el código de Go Back-N. Para ello use como base/inspiración el código de Stop & Wait que usa la clase SocketUDP y SlidingWindowsCC de la sección anterior.
+
+Antes de comenzar a programar responda las siguientes preguntas y agregue sus respuestas al informe:
+- (1) ¿Por qué le puede servir usar como base para Go Back-N el código de Stop & Wait de la sección anterior? ¿Qué similitud tiene Go Back-N con Stop & Wait?
+- (2) En la sección anterior solo se muestra la función send de Stop & Wait, ¿Qué ocurre con la función recv? ¿Esta función cambia con el uso de SocketUDP  y SlidingWindowsCC?
+Test: Responda las preguntas antes de continuar.
+Cree dentro de su clase SocketTCP la función send_using_stop_and_wait y recv_using_stop_and_wait. Mueva los códigos de su función recv y send dentro de estas nuevas funciones. Luego de hacer este cambio las funciones send y recv quedarán vacías.
+- send_using_stop_and_wait(message): Contiene el código que antes se encontraba en la función send(message).
+
+- recv_using_stop_and_wait(buff_size): Contiene el código que antes se encontraba en la función recv(buff_size).
+
+Haga que sus funciones send y recv puedan recibir una variable 'mode' la cual indicará qué tipo de instancia ARQ que deberán usar por dentro sus funciones. Para ello puede usar el siguiente código el cual le permitirá dejar Stop & Wait como su default:
+    
+    def send(self, message, mode="stop_and_wait"):
+        if mode == "stop_and_wait":
+            self.send_using_stop_and_wait(message)
+    
+    def recv(self, buff_size, mode="stop_and_wait"):
+        if mode == "stop_and_wait":
+            self.recv_using_stop_and_wait(buff_size)
+
+Cree las funciones send_using_go_back_n y recv_using_go_back_n para manejar el envío de datos usando Go Back-N. Para ello use como base/inspiración el código de Stop & Wait que usa la clase SocketUDP  y SlidingWindowsCC de la sección anterior. 
+>>> IMPORTANTE: Se espera que haya completado el punto 1 para realizar esta parte, de lo contrario esto va a ser innecesariamente difícil.
+Test (sin pérdida): Agregue a sus funciones send y recv la opción mode="go_back_n" que permita que dichas funciones llamen por dentro a las funciones send_using_go_back_n y recv_using_go_back_n respectivamente para manejar el envío de datos. Pruebe que puede utilizar send y recv utilizando mode="go_back_n" para enviar archivos. Para ello utilice las pruebas provistas del paso 5 de la actividad anterior, más las pruebas finales que realizó en su actividad de Stop & Wait. 
+Test (con pérdida): Una vez haya comprobado que su código funciona bien sin pérdidas, repita el test anterior esta vez induciendo pérdidas. (Recuerde que siempre puede inducir pérdidas a mano si no tiene acceso a netem)
+Parte 3 (1.5 ptos)
+Modifique la función send_using_go_back_n de su clase SocketTCP para que haga control de congestión usando un objeto tipo CongestionControl  (recuerde usar la copia que se pidió en el paso 1). Para ello siga los siguientes pasos:
+
+Cree la variable congestion_controler. Aquí congestion_controler es un objeto tipo CongestionControl con MSS = 8 bytes.
+Haga que su función  send_using_go_back_n(message) divida el mensaje message en trozos de tamaño MSS para crear la variable data_list (antes lo dividía en trozos de tamaño 16 bytes).
+Inicialize su ventana de envío data_window usando su objeto congestion_controler.
+Test: Según lo visto en el video y en los tests de la clase CongestionControl ¿qué valor debería tener window_size en este punto? Añada un modo debug para la ventana de congestión y verifique que su código entrega lo correcto.
+Invoque las funciones event_timeout() y event_ack_received() de su objeto CongestionControl donde corresponda. Es decir, en el área de su código que maneja el timeout haga que su objeto CongestionControl llame a event_timeout() cuando ocurre timeout, y cuando reciba ACKs que llame a event_ack_received().
+Haga que su código actualice la variable window_size luego de cada evento que pueda modificar la cwnd de su objeto CongestionControl (ver punto anterior). Para actualizar el tamaño de su ventana use su objeto congestion_controler. Para finalizar, haga que su variable data_window actualize su tamaño usando la función update_window_size cada vez que actualice la variable window_size. Note que si entran k nuevos elementos a la ventana usted debe enviar estos k nuevos elementos de manera consecutiva, tal como lo hace cuando avanza su ventana en k espacios.
+Caso borde: note que window_size puede disminuir su tamaño justo después de haber enviado el último elemento de la ventana previa, es decir que luego de disminuir window_size le puede llegar un ACK con un número de secuencia mayor que el número de secuencia más grande dentro de su ventana, si esto ocurre simplemente mueva su ventana como si le hubiese llegado el último elemento de la misma. Note que es posible que deba repetir esta acción más de una vez antes de que el ACK caiga dentro de la ventana.
+
+Test: Extienda su modo debug para que le permita ver cómo evoluciona su ventana de congestión.
+Pruebas
+[Puntaje informe: 1.5pts]
+
+Para esta actividad queremos probar que los cambios de estado y tamaño de ventana ocurren tal como esperamos conforme llegan ACKs y ocurren timeouts. Para sus pruebas use un cliente y un servidor simple (puede usar los mismos que utilizó en la actividad anterior).
+
+Primero, añada a su informe las respuestas a las preguntas hechas en el paso 1 de la parte 2.
+Compruebe que los datos siguen llegando de manera íntegra de origen a destino luego de añadir control de congestión. Para ello haga pruebas con y sin pérdida de datos. Puede simular pérdida usando netem loss (recuerde desactivar las pérdidas luego de hacer sus pruebas). Alternativamente puede forzar pérdidas de forma manual.
+Observe cómo se comporta su implementación de control de congestión sin inducir pérdida y vea si ocurren timeouts de forma espontánea (sin usar netem loss). Verifique que los cambios de estado y variables de control de congestión son correctos. Para observar este comportamiento use el modo debug implementado.
+Repita la prueba del punto anterior induciendo pérdidas.
+¿Cómo se compara Go-back N con control de congestión versus sin control de congestión? ¿Cuál toma menos tiempo en transmitir un archivo de más de 100 KB? Para responder estas preguntas configure una tasa de pérdida del 20% y utilice su código con control de congestión para transmitir un archivo de 100kB. Registre las cantidades de mensajes intercambiados (puede añadir un atributo number_of_sent_segments ) y mida el tiempo que se demora el envío. Repita este experimento 5 veces y compárelo con los resultados obtenidos para Go-back N de la actividad de comunicación confiable.  Añada las respuestas a las preguntas anteriores a su mini-informe.
