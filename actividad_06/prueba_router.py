@@ -1,7 +1,7 @@
 import socket
 import sys
 
-
+#Crea un paquete en bytes a partir de los datos entregados.
 def create_packet(
     destination_ip: str,
     destination_port: int,
