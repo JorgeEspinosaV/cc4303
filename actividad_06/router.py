@@ -8,23 +8,9 @@ HEADER_SIZE = 20
 round_robin_positions = {}
 received_fragments = {}
 
-
+#Crea un paquete IP en bytes usando el header de fragmentación.
 def create_packet(parsed_packet):
-    """
-    create_packet(parsed_packet) -> bytes
 
-    Crea un paquete IP en bytes usando el header de fragmentación.
-
-    Header:
-    - IP destino: 4 bytes
-    - Puerto destino: 2 bytes
-    - TTL: 1 byte
-    - ID: 4 bytes
-    - Offset: 4 bytes
-    - Tamaño mensaje: 4 bytes
-    - FLAG: 1 byte
-    - Mensaje: n bytes
-    """
     destination_ip = parsed_packet["destination_ip"]
     destination_port = parsed_packet["destination_port"]
     ttl = parsed_packet["ttl"]
@@ -58,24 +44,9 @@ def create_packet(parsed_packet):
         + message_bytes
     )
 
-
+#Recibe un paquete en bytes y extrae los campos del header.
 def parse_packet(ip_packet):
-    """
-    parse_packet(ip_packet) -> dict
-
-    Recibe un paquete en bytes y extrae los campos del header.
-
-    Paso a paso:
-    1. Verifica que el paquete tenga al menos 20 bytes de header.
-    2. Extrae IP destino.
-    3. Extrae puerto destino.
-    4. Extrae TTL.
-    5. Extrae ID.
-    6. Extrae Offset.
-    7. Extrae Tamaño.
-    8. Extrae FLAG.
-    9. Extrae el mensaje.
-    """
+ 
     if len(ip_packet) < HEADER_SIZE:
         raise ValueError("El paquete es demasiado pequeño")
 
@@ -99,19 +70,9 @@ def parse_packet(ip_packet):
         "message": message,
     }
 
-
+#Busca el siguiente salto y el MTU del enlace, retorna ((next_hop_ip, next_hop_port), mtu), sino None
 def check_routes(routes_file_name, destination_address):
-    """
-    check_routes(routes_file_name, destination_address) -> tuple | None
-
-    Busca el siguiente salto y el MTU del enlace.
-
-    Retorna:
-        ((next_hop_ip, next_hop_port), mtu)
-
-    Si no existe ruta:
-        None
-    """
+   
     destination_ip, destination_port = destination_address
     matching_routes = []
 
@@ -161,21 +122,9 @@ def check_routes(routes_file_name, destination_address):
 
     return selected_route
 
-
+#Fragmenta un paquete IP si su tamaño total supera el MTU.
 def fragment_IP_packet(ip_packet, mtu):
-    """
-    fragment_IP_packet(ip_packet, mtu) -> list
-
-    Fragmenta un paquete IP si su tamaño total supera el MTU.
-
-    Paso a paso:
-    1. Si el paquete completo cabe en el MTU, retorna [ip_packet].
-    2. Si no cabe, calcula cuántos bytes de mensaje caben por fragmento.
-    3. Divide el mensaje en trozos.
-    4. Crea un paquete nuevo para cada trozo.
-    5. Ajusta offset, size y flag de cada fragmento.
-    6. Retorna la lista de fragmentos.
-    """
+  
     if len(ip_packet) <= mtu:
         return [ip_packet]
 
@@ -215,23 +164,9 @@ def fragment_IP_packet(ip_packet, mtu):
 
     return fragments
 
-
+#Intenta reensamblar un paquete original desde una lista de fragmentos.
 def reassemble_IP_packet(fragment_list):
-    """
-    reassemble_IP_packet(fragment_list) -> bytes | None
 
-    Intenta reensamblar un paquete original desde una lista de fragmentos.
-
-    Paso a paso:
-    1. Parsea todos los fragmentos.
-    2. Ordena los fragmentos por offset.
-    3. Si solo hay un fragmento completo, lo retorna.
-    4. Verifica continuidad de offsets.
-    5. Verifica que el último fragmento tenga FLAG 0.
-    6. Une los mensajes.
-    7. Retorna un paquete reensamblado.
-    8. Si faltan fragmentos, retorna None.
-    """
     if not fragment_list:
         return None
 
@@ -277,35 +212,14 @@ def reassemble_IP_packet(fragment_list):
 
     return create_packet(reassembled_packet)
 
-
+#Convierte el mensaje desde bytes a string.
 def get_message_as_text(parsed_packet):
-    """
-    get_message_as_text(parsed_packet) -> str
 
-    Convierte el mensaje desde bytes a string.
-    """
     return parsed_packet["message"].decode("utf-8", errors="replace")
 
-
+#Ejecuta el router con soporte de fragmentación.
 def main():
-    """
-    main() -> None
-
-    Ejecuta el router con soporte de fragmentación.
-
-    Paso a paso:
-    1. Lee IP, puerto y archivo de rutas desde sys.argv.
-    2. Crea un socket UDP.
-    3. Recibe paquetes en ciclo infinito.
-    4. Descarta paquetes con TTL 0.
-    5. Si el paquete es para este router, lo guarda por ID.
-    6. Intenta reensamblar los fragmentos del mismo ID.
-    7. Si logra reensamblar, imprime el mensaje.
-    8. Si no es para este router, busca ruta y MTU.
-    9. Decrementa el TTL.
-    10. Fragmenta según el MTU.
-    11. Envía cada fragmento al siguiente salto.
-    """
+    
     if len(sys.argv) != 4:
         print("Uso: python3 router.py router_IP router_puerto archivo_rutas")
         sys.exit(1)

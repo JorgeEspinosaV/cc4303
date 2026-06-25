@@ -1,7 +1,7 @@
 import socket
 import sys
 
-
+#Crea un paquete en bytes con header de fragmentación.
 def create_packet(
     destination_ip,
     destination_port,
@@ -10,13 +10,8 @@ def create_packet(
     offset,
     size,
     flag,
-    message,
-):
-    """
-    create_packet(destination_ip, destination_port, ttl, packet_id, offset, size, flag, message) -> bytes
-
-    Crea un paquete en bytes con header de fragmentación.
-    """
+    message,):
+  
     message_bytes = message.encode("utf-8")
 
     ip_bytes = socket.inet_aton(destination_ip)
@@ -38,16 +33,9 @@ def create_packet(
         + message_bytes
     )
 
-
+#Envía un paquete individual hacia el router inicial.
 def main():
-    """
-    main() -> None
 
-    Envía un paquete individual hacia el router inicial.
-
-    Uso:
-        python3 enviar.py IP_destino puerto_destino TTL ID OFFSET FLAG mensaje IP_router_inicial puerto_router_inicial
-    """
     if len(sys.argv) != 10:
         print(
             "Uso: python3 enviar.py "
